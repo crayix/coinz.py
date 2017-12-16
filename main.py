@@ -11,7 +11,7 @@ from pydub.playback import play
 
 from popups import *
 from utils import RepeatedTimer
-from calls import *
+from calls import get_ticker, get_last_price
 
 root = tkinter.Tk()
 
@@ -97,9 +97,12 @@ class Overview:
         #style.configure("Treeview", background=_BG_COLOR, foreground=_LIGHT_BG_COLOR, fieldbackground=_BG_COLOR)
 
         #get btc price, start timer, init coin list
-        self.btc_price = GetTicker("usdt-btc").json()["result"]["Last"]
-        self.eth_price = GetTicker("usdt-eth").json()["result"]["Last"]
-        self.bnb_price = GetTickerBinance("BNBUSDT").json()["lastPrice"]
+
+        self.market_price = {
+            'btc': get_last_price['Bittrex']("usdt","btc"),
+            'eth': get_last_price['Bittrex']("usdt","eth"),
+            'bnb': get_last_price['Binance']("usdt","bnb")
+        }
         self.rt = RepeatedTimer(15, self.update_coins, "World")
         self.coin_list = []
 
@@ -188,37 +191,20 @@ class Overview:
 
     def update_coins(self,args):
         #update btc price and btc display
-        self.btc_price = GetTicker("usdt-btc").json()["result"]["Last"]
-        self.eth_price = GetTicker("usdt-eth").json()["result"]["Last"]
-        self.bnb_price = GetTickerBinance("BNBUSDT").json()["lastPrice"]
-        self.status_price_text.set(("BTC: " + self.format_dollar(self.btc_price)))
+        self.market_price = {
+            'btc': get_last_price['Bittrex']("usdt","btc"),
+            'eth': get_last_price['Bittrex']("usdt","eth"),
+            'bnb': get_last_price['Binance']("usdt","bnb")
+        }
+        self.status_price_text.set(("BTC: " + self.format_dollar(self.market_price['btc'])))
         #update coin objects
         for c in self.coin_list:
-            if c.exchange == Exchange.Bittrex.name:
-                coin_data = GetTicker(c.market+"-"+c.name).json()
-                if c.market == Market.BTC.name:
-                    c.market_price = self.format_satoshi(coin_data["result"]["Last"])
-                    c.usd_price = self.format_dollar(coin_data["result"]["Last"]*self.btc_price)
-                elif c.market == Market.ETH.name:
-                    c.market_price = self.format_satoshi(coin_data["result"]["Last"])
-                    c.usd_price = self.format_dollar(coin_data["result"]["Last"]*self.eth_price)
-                elif c.market == Market.USDT.name:
-                    c.market_price = self.format_dollar(coin_data["result"]["Last"])
-                    c.usd_price = "-"
-            elif c.exchange == Exchange.Binance.name:
-                coin_data = GetTickerBinance(c.name+""+c.market).json()
-                if c.market == Market.BTC.name:
-                    c.market_price = self.format_satoshi(float(coin_data["lastPrice"]))
-                    c.usd_price = self.format_dollar(float(coin_data["lastPrice"])*float(self.btc_price))
-                if c.market == Market.ETH.name:
-                    c.market_price = self.format_satoshi(float(coin_data["lastPrice"]))
-                    c.usd_price = self.format_dollar(float(coin_data["lastPrice"])*float(self.eth_price))
-                if c.market == Market.USDT.name:
-                    c.market_price = self.format_dollar(coin_data["lastPrice"])
-                    c.usd_price = "-"
-                if c.market == Market.BNB.name:
-                    c.market_price = self.format_satoshi(float(coin_data["lastPrice"]))
-                    c.usd_price = self.format_dollar(float(coin_data["lastPrice"])*float(self.bnb_price))
+            if c.market is not Market.USDT.name:
+                c.market_price = self.format_satoshi(get_last_price[c.exchange](c.market,c.name))
+                c.usd_price = self.format_dollar(get_last_price[c.exchange](c.market,c.name)*self.market_price[c.market.lower()])
+            else:
+                c.market_price = self.format_dollar(get_last_price[c.exchange](c.market,c.name))
+                c.usd_price = "-"
             #this will return alert events if any are tripped
             alert_events = c.check_alerts()
             if alert_events is not None:
@@ -256,38 +242,16 @@ class Overview:
             if c_form[2].lower() == c.name.lower() and c_form[0].lower() == c.exchange.lower() and c_form[1].lower() == c.market.lower():
                 InfoPopup(self.master,"You already added this coin!")
                 return
-
             
-        d_market_price = 0
-        d_usd_price = 0
+        _market_price = 0
+        _usd_price = 0
 
-        if c_form[0] == Exchange.Bittrex.name:
-            #bittrex
-            #print(c_form[1]+"-"+c_form[2])
-            coin_data = GetTicker(c_form[1]+"-"+c_form[2]).json()
-            if c_form[1] == Market.BTC.name:
-                d_market_price = self.format_satoshi(coin_data["result"]["Last"])
-                d_usd_price = self.format_dollar(coin_data["result"]["Last"]*self.btc_price)
-            elif c_form[1] == Market.ETH.name:
-                d_market_price = self.format_satoshi(coin_data["result"]["Last"])
-                d_usd_price = self.format_dollar(coin_data["result"]["Last"]*self.eth_price)
-            elif c_form[1] == Market.USDT.name:
-                d_market_price = self.format_dollar(coin_data["result"]["Last"])
-                d_usd_price = "-"
-        elif c_form[0] == Exchange.Binance.name:
-                coin_data = GetTickerBinance(c_form[2].upper()+""+c_form[1].upper()).json()
-                if c_form[1] == Market.BTC.name:
-                    d_market_price = self.format_satoshi(float(coin_data["lastPrice"]))
-                    d_usd_price = self.format_dollar(float(coin_data["lastPrice"])*float(self.btc_price))
-                if c_form[1] == Market.ETH.name:
-                    d_market_price = self.format_satoshi(float(coin_data["lastPrice"]))
-                    d_usd_price = self.format_dollar(float(coin_data["lastPrice"])*float(self.eth_price))
-                if c_form[1] == Market.USDT.name:
-                    d_market_price = self.format_dollar(coin_data["lastPrice"])
-                    d_usd_price = "-"
-                if c_form[1] == Market.BNB.name:
-                    d_market_price = self.format_satoshi(float(coin_data["lastPrice"]))
-                    d_usd_price = self.format_dollar(float(coin_data["lastPrice"])*float(self.bnb_price))
+        if c_form[1] is not Market.USDT.name:
+            _market_price = self.format_satoshi(get_last_price[c_form[0]](c_form[1],c_form[2]))
+            _usd_price = self.format_dollar(get_last_price[c_form[0]](c_form[1],c_form[2])*self.market_price[c_form[1]])
+        else:
+            _market_price = self.format_dollar(get_last_price[c_form[0]](c_form[1],c_form[2]))
+            _usd_price = "-"
             
         _coin = Coin(
                 c_form[2].upper(),

@@ -17,9 +17,9 @@ root = tkinter.Tk()
 
 #the alert class, holds the price and whether to check for it being below or above
 class Alert(object):
-    def __init__(self, btc_price, usd_price, g_l):
-        self.btc_price = btc_price
-        self.usd_price = usd_price
+    def __init__(self, market, value, g_l):
+        self.market = market
+        self.value = value
         self.g_l = g_l
 
 #the alert event class, this is sent back when an alert is triggered
@@ -53,21 +53,15 @@ class Coin(object):
     def check_alerts(self):
         alert_events = []
         for a in self.alerts:
-            if a.g_l and a.btc_price != None:
-                if float(self.btc_price) > float(a.btc_price):
-                    alert_events.append(AlertEvent(a, "BTC price is now " + self.btc_price + " (greater than the alert price, set at " + a.btc_price + ")"))
+            old_price = float(a.value)
+            new_price = get_last_price[self.exchange](a.market,self.name)
+            if a.g_l:
+                if new_price > old_price:
+                    alert_events.append(AlertEvent(a, "price is now " + str(new_price) + ""+ self.market + "(greater than the alert price, set at " + str(old_price) + ")"))
                     self.remove_alert(a)
-            if a.g_l and a.usd_price != None:
-                if float(self.usd_price) > float(a.usd_price):
-                    alert_events.append(AlertEvent(a, "USD price is now " + self.usd_price + " (greater than the alert price, set at " + a.usd_price + ")"))
-                    self.remove_alert(a)
-            if not a.g_l and a.btc_price != None:
-                if float(self.btc_price) < float(a.btc_price):
-                    alert_events.append(AlertEvent(a, "BTC price is now " + self.btc_price + " (less than the alert price, set at " + a.btc_price + ")"))
-                    self.remove_alert(a)
-            if not a.g_l and a.usd_price != None:
-                if float(self.usd_price) < float(a.usd_price):
-                    alert_events.append(AlertEvent(a, "USD price is now " + self.usd_price + " (less than the alert price, set at " + a.usd_price + ")"))
+            else:
+                if new_price < old_price:
+                    alert_events.append(AlertEvent(a, "price is now " + str(new_price) + ""+ self.market + "(less than the alert price, set at " + str(old_price) + ")"))
                     self.remove_alert(a)
             return alert_events
 
@@ -98,7 +92,7 @@ class Overview:
 
         #get btc price, start timer, init coin list
 
-        self.market_price = {
+        self.market_prices = {
             'btc': get_last_price['Bittrex']("usdt","btc"),
             'eth': get_last_price['Bittrex']("usdt","eth"),
             'bnb': get_last_price['Binance']("usdt","bnb")
@@ -191,17 +185,17 @@ class Overview:
 
     def update_coins(self,args):
         #update btc price and btc display
-        self.market_price = {
+        self.market_prices = {
             'btc': get_last_price['Bittrex']("usdt","btc"),
             'eth': get_last_price['Bittrex']("usdt","eth"),
             'bnb': get_last_price['Binance']("usdt","bnb")
         }
-        self.status_price_text.set(("BTC: " + self.format_dollar(self.market_price['btc'])))
+        self.status_price_text.set(("BTC: " + self.format_dollar(self.market_prices['btc'])))
         #update coin objects
         for c in self.coin_list:
             if c.market is not Market.USDT.name:
                 c.market_price = self.format_satoshi(get_last_price[c.exchange](c.market,c.name))
-                c.usd_price = self.format_dollar(get_last_price[c.exchange](c.market,c.name)*self.market_price[c.market.lower()])
+                c.usd_price = self.format_dollar(get_last_price[c.exchange](c.market,c.name)*self.market_prices[c.market.lower()])
             else:
                 c.market_price = self.format_dollar(get_last_price[c.exchange](c.market,c.name))
                 c.usd_price = "-"
@@ -248,7 +242,7 @@ class Overview:
 
         if c_form[1] is not Market.USDT.name:
             _market_price = self.format_satoshi(get_last_price[c_form[0]](c_form[1],c_form[2]))
-            _usd_price = self.format_dollar(get_last_price[c_form[0]](c_form[1],c_form[2])*self.market_price[c_form[1]])
+            _usd_price = self.format_dollar(get_last_price[c_form[0]](c_form[1],c_form[2])*self.market_prices[c_form[1].lower()])
         else:
             _market_price = self.format_dollar(get_last_price[c_form[0]](c_form[1],c_form[2]))
             _usd_price = "-"
@@ -257,8 +251,8 @@ class Overview:
                 c_form[2].upper(),
                 c_form[0],
                 c_form[1],
-                d_market_price,
-                d_usd_price)
+                _market_price,
+                _usd_price)
         
         self.coin_list.append(_coin)
 
@@ -281,7 +275,8 @@ class Overview:
         remove_successful = False
         if AreYouSure.value:
             for c in self.coin_list:
-                if compare(cointree_item, [c.name, c.btc_price, c.usd_price]):
+                print(cointree_item,[c.exchange, c.market, c.name, c.market_price, c.usd_price])
+                if compare(cointree_item, [c.exchange, c.market, c.name, c.market_price, c.usd_price]):
                     #found it
                     #remove from treeview
                     self.cointree.delete(selected_coin)
@@ -311,7 +306,7 @@ class Overview:
             InfoPopup(self.master, "You must select a coin to view alerts!")
             return
         #find coin obj from selected treeview item
-        coin_obj = next((v for v in self.coin_list if v.name == self.cointree.item(selected_coin)["values"][0]), None)
+        coin_obj = self.find_coin_from_selection(selected_coin)
         #make sure shit is there
         if coin_obj is None:
             ErrorPopup(self.master, "Selected coin not found in the internal coin list!")
@@ -325,6 +320,13 @@ class Overview:
         ##user might have deleted alerts, so update the alert column
         self.cointree.set(selected_coin,column="alerts",value=len(coin_obj.alerts))
 
+    def find_coin_from_selection(self,selection):
+        c = next(iter([x for x in self.coin_list if x.name.lower() == self.cointree.item(selection)["values"][2].lower() and x.exchange.lower() == self.cointree.item(selection)["values"][0].lower() and x.market.lower() == self.cointree.item(selection)["values"][1].lower()]),None)
+        if c is None:
+            print("not found!")
+            return
+        return c
+
     def add_alert(self):
         selected_coin = self.cointree.selection()[0] if len(self.cointree.selection()) > 0 else None
         #if shit in None show a popup
@@ -332,7 +334,10 @@ class Overview:
             InfoPopup(self.master, "You must select a coin to add an alert!")
             return
 
-        self.add_alert_popup=AddAlertPopup(self.master)
+        #find coin obj from selected treeview item
+        coin_obj = self.find_coin_from_selection(selected_coin)
+
+        self.add_alert_popup=AddAlertPopup(self.master,coin_obj)
         self.addalert_button["state"] = "disabled"
         self.master.wait_window(self.add_alert_popup.top)
         self.addalert_button["state"] = "normal"
@@ -344,19 +349,14 @@ class Overview:
 
         alert_data = self.add_alert_popup.value
         #todo:check data for validity
+        print(alert_data)
 
-        #find coin obj from selected treeview item
-        coin_obj = next((v for v in self.coin_list if v.name == self.cointree.item(selected_coin)["values"][0]), None)
-        #make sure shit is there
-        if coin_obj is None:
-            ErrorPopup(self.master, "Selected coin not found in the internal coin list!")
-            return
         ##add alert to the coin object if shit is there
         coin_obj.add_alert(
             Alert(
-                alert_data[2] if alert_data[1] == '0' else None,
-                alert_data[2] if alert_data[1] == '1' else None,
-                True if alert_data[0] == '1' else False
+                alert_data[2],
+                alert_data[1],
+                True if alert_data[0] == 'above' else False
             )
         )
         ##update alert count in the treeview

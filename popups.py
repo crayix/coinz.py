@@ -131,30 +131,29 @@ class AddCoinPopup(object):
         self.top.destroy()
 
 class AddAlertPopup(object):
-    def __init__(self, master):
-        self.top = Toplevel(master, padx=60)
+    def __init__(self, master,coin):
+        self.top = Toplevel(master)
         self.top.title("Add Alert")
-        Label(self.top, text=("Alert when price goes")).pack()
-
-        self.below_above_var = StringVar()
-        b_m = [("below", "0"), ("above", "1")]
-        for text, mode in b_m:
-            Radiobutton(self.top, text=text, variable=self.below_above_var, value=mode).pack()
+        Label(self.top, text=("Alert when price goes")).grid(row=0,column=0,columnspan=2,sticky="NEWS")
+        b_m = ["above", "below"]
+        self.a = Combobox(self.top, values=b_m, width=10)
+        self.a.set(b_m[0])
+        self.a.grid(row=1,column=0,sticky="NEWS")
 
         self.e = Entry(self.top)
         self.e.focus_set()
-        self.e.pack()
+        self.e.grid(row=1,column=1,sticky="NEWS")
 
-        self.satoshi_dollar_var = StringVar()
-        s_m = [("satoshis", "0"), ("dollars", "1")]
-        for text, mode in s_m:
-            Radiobutton(self.top, text=text, variable=self.satoshi_dollar_var, value=mode).pack()
+        mark = [coin.market, "USDT"]
+        self.m = Combobox(self.top, values=mark, width=10)
+        self.m.set(mark[0])
+        self.m.grid(row=1,column=2,sticky="NEWS")
 
-        Button(self.top, text='Ok', command=self.cleanup).pack()
+        Button(self.top, text='Ok', command=self.cleanup).grid(row=2,column=0,columnspan=3)
         ##center after packing
         center(self.top, master)
     def cleanup(self):
-        self.value = [self.below_above_var.get(), self.satoshi_dollar_var.get(), self.e.get()]
+        self.value = [self.a.get(), self.e.get(), self.m.get()]
         self.top.destroy()
 
 class ViewAlertsPopup(object):
@@ -164,7 +163,7 @@ class ViewAlertsPopup(object):
         ##need self.coin later
         self.coin = coin
         ##create treeview
-        at_header = ["?", "฿itcoin ฿rice", "usd price"]
+        at_header = ["?", "value", "market"]
         at_width = [90, 100, 100]
         ##need alerttree later
         self.alerttree = Treeview(self.top, selectmode="extended", columns=at_header, show="headings")
@@ -177,7 +176,7 @@ class ViewAlertsPopup(object):
             less_or_greater = "less than"
             if a.g_l:
                 less_or_greater = "greater than"
-            self.alerttree.insert('', 'end', values=(less_or_greater, a.btc_price, a.usd_price))
+            self.alerttree.insert('', 'end', values=(less_or_greater, a.value, a.market))
         #buttons
         self.removealert_button = Button(self.top, text='Remove Alert', command=self.remove_alert)
         self.removealert_button.grid(column=1, row=6, sticky="NEWS")
@@ -200,16 +199,7 @@ class ViewAlertsPopup(object):
                 alt_a_g_l_value = 'less than'
                 if a.g_l:
                     alt_a_g_l_value = 'greater than'
-
-                alt_btc_price_value = 'None'
-                if a.btc_price != None:
-                    alt_btc_price_value = a.btc_price
-
-                alt_usd_price_value = 'None'
-                if a.usd_price != None:
-                    alt_usd_price_value = a.usd_price
-
-                if compare(at_value, [alt_a_g_l_value, alt_btc_price_value, alt_usd_price_value]):
+                if compare(at_value, [alt_a_g_l_value, float(a.value), a.market]):
                     #found it
                     self.alerttree.delete(self.alerttree.selection()[0])
                     self.coin.alerts = [x for x in self.coin.alerts if x != a]

@@ -3,6 +3,7 @@ from tkinter import Menu, Toplevel, StringVar
 import tkinter
 import collections
 
+
 from pydub import AudioSegment
 from pydub.playback import play
 import os
@@ -105,19 +106,28 @@ class EditSoundsPopup(object):
         self.top.destroy()
 
 class AddCoinPopup(object):
-    def __init__(self, master):
+    def __init__(self, master,overview):
         #228 107
         self.top = Toplevel(master, padx=50, pady=5)
         self.top.title("Add Coin")
-        Label(self.top, text="Enter ticker").pack()
+        #Label(self.top, text="Add coin").grid(row=0,column=0,columnspan=2,sticky="NEWS")
+        exch = ["Bittrex", "Binance"]
+        
+        mark = ["BTC","ETH","BNB", "USDT"]
+        self.c = Combobox(self.top, values=exch, width=10)
+        self.c.set(exch[0])
+        self.c.grid(row=0,column=0,columnspan=2,sticky="NEWS")
+        self.m = Combobox(self.top, values=mark, width=10)
+        self.m.set(mark[0])
+        self.m.grid(row=1,column=0,sticky="NEWS")
         self.e = Entry(self.top)
         self.e.focus_set()
-        self.e.pack()
-        Button(self.top, text='Ok', command=self.cleanup).pack()
+        self.e.grid(row=1,column=1,columnspan=1,sticky="NEWS")
+        Button(self.top, text='Ok', command=self.cleanup).grid(row=2,column=0,columnspan=2)
         ##center after packing
         center(self.top, master)
     def cleanup(self,):
-        self.value = self.e.get()
+        self.value = [self.c.get(), self.m.get(), self.e.get()]
         self.top.destroy()
 
 class AddAlertPopup(object):

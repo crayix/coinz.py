@@ -4,6 +4,7 @@ import tkinter
 import os, sys, math, collections, pickle
 from os import listdir
 from os.path import isfile, join
+from enum import Enum
 
 from pydub import AudioSegment
 from pydub.playback import play
@@ -27,16 +28,24 @@ class AlertEvent(object):
         self.alert = alert
         self.info = info
 
-class NotifSound(object):
-    def __init__(self, filename, path, selected):
-        self.filename = filename
-        self.path = path
+class Exchange(Enum):
+    Bittrex = 1
+    Binance = 2
+
+class Market(Enum):
+    BTC = 1
+    ETH = 2
+    USDT = 3
+    BNB = 4
 
 # the coin class, this is used to hold info about a coin including list of alerts
 class Coin(object):
-    def __init__(self, name, btc_price, usd_price):
+    def __init__(self, name, exchange, market, market_price, usd_price):
         self.name = name
-        self.btc_price = btc_price
+        self.exchange = exchange
+        self.market = market
+        ##used for btc-XXX, ltc-XXX etc
+        self.market_price = market_price
         self.usd_price = usd_price
         self.alerts = []
         self.displayed = False
@@ -89,6 +98,8 @@ class Overview:
 
         #get btc price, start timer, init coin list
         self.btc_price = GetTicker("usdt-btc").json()["result"]["Last"]
+        self.eth_price = GetTicker("usdt-eth").json()["result"]["Last"]
+        self.bnb_price = GetTickerBinance("BNBUSDT").json()["lastPrice"]
         self.rt = RepeatedTimer(15, self.update_coins, "World")
         self.coin_list = []
 
@@ -104,8 +115,8 @@ class Overview:
         root.config(menu=self.menubar)
 
         #create treeview
-        ct_header = ["shitcoin", "฿itcoin ฿rice", "usd price", "alerts"]
-        ct_width = [128, 100, 100, 40]
+        ct_header = ["exchange", "market","shitcoin", "market price", "usd price", "alerts"]
+        ct_width = [80,80, 128, 100, 100, 40]
         self.cointree = Treeview(master, selectmode="browse", columns=ct_header, show="headings")
         for i in range(len(ct_header)):
             self.cointree.heading(ct_header[i], text=ct_header[i])
@@ -178,12 +189,36 @@ class Overview:
     def update_coins(self,args):
         #update btc price and btc display
         self.btc_price = GetTicker("usdt-btc").json()["result"]["Last"]
+        self.eth_price = GetTicker("usdt-eth").json()["result"]["Last"]
+        self.bnb_price = GetTickerBinance("BNBUSDT").json()["lastPrice"]
         self.status_price_text.set(("BTC: " + self.format_dollar(self.btc_price)))
         #update coin objects
         for c in self.coin_list:
-            coin_data = GetTicker(c.name).json()
-            c.btc_price = self.format_satoshi(coin_data["result"]["Last"])
-            c.usd_price = self.format_dollar(coin_data["result"]["Last"]*self.btc_price)
+            if c.exchange == Exchange.Bittrex.name:
+                coin_data = GetTicker(c.market+"-"+c.name).json()
+                if c.market == Market.BTC.name:
+                    c.market_price = self.format_satoshi(coin_data["result"]["Last"])
+                    c.usd_price = self.format_dollar(coin_data["result"]["Last"]*self.btc_price)
+                elif c.market == Market.ETH.name:
+                    c.market_price = self.format_satoshi(coin_data["result"]["Last"])
+                    c.usd_price = self.format_dollar(coin_data["result"]["Last"]*self.eth_price)
+                elif c.market == Market.USDT.name:
+                    c.market_price = self.format_dollar(coin_data["result"]["Last"])
+                    c.usd_price = "-"
+            elif c.exchange == Exchange.Binance.name:
+                coin_data = GetTickerBinance(c.name+""+c.market).json()
+                if c.market == Market.BTC.name:
+                    c.market_price = self.format_satoshi(float(coin_data["lastPrice"]))
+                    c.usd_price = self.format_dollar(float(coin_data["lastPrice"])*float(self.btc_price))
+                if c.market == Market.ETH.name:
+                    c.market_price = self.format_satoshi(float(coin_data["lastPrice"]))
+                    c.usd_price = self.format_dollar(float(coin_data["lastPrice"])*float(self.eth_price))
+                if c.market == Market.USDT.name:
+                    c.market_price = self.format_dollar(coin_data["lastPrice"])
+                    c.usd_price = "-"
+                if c.market == Market.BNB.name:
+                    c.market_price = self.format_satoshi(float(coin_data["lastPrice"]))
+                    c.usd_price = self.format_dollar(float(coin_data["lastPrice"])*float(self.bnb_price))
             #this will return alert events if any are tripped
             alert_events = c.check_alerts()
             if alert_events is not None:
@@ -195,19 +230,16 @@ class Overview:
                     #display each one
                     for a in alert_events:
                         AlertPopup(self.master, c, a.info)
-        #coin objects are updated, time to update display
-        if len(self.cointree.get_children()) > 0:
-            for y in self.cointree.get_children():
-                c = [f for f in self.coin_list if f.name == self.cointree.item(y)["values"][0]]
-                if len(c) > 0:
-                    self.cointree.set(y,column="฿itcoin ฿rice",value=c[0].btc_price)
-                    self.cointree.set(y,column="usd price",value=c[0].usd_price)
-                    self.cointree.set(y,column="alerts",value=len(c[0].alerts))
-                else:
-                    ErrorPopup(self.master, "error updating " + c[0].name )
+            #coin object is updated, time to update display
+            if len(self.cointree.get_children()) > 0:
+                for y in self.cointree.get_children():
+                    if c.name.lower() == self.cointree.item(y)["values"][2].lower() and c.market.lower() == self.cointree.item(y)["values"][1].lower() and c.exchange.lower() == self.cointree.item(y)["values"][0].lower():
+                        self.cointree.set(y,column="market price",value=c.market_price)
+                        self.cointree.set(y,column="usd price",value=c.usd_price)
+                        self.cointree.set(y,column="alerts",value=len(c.alerts))
 
     def add_coin(self):
-        self.add_coin_popup =AddCoinPopup(self.master)
+        self.add_coin_popup =AddCoinPopup(self.master,self)
         self.addcoin_button["state"] = "disabled"
         self.master.wait_window(self.add_coin_popup.top)
         self.addcoin_button["state"] = "normal"
@@ -217,28 +249,55 @@ class Overview:
             print("no value 'value' in add_coin_popup")
             return
         #get ticker from input
-        coin_ticker = self.add_coin_popup.value
-        #rudimentary check for validity
-        if coin_ticker.find("-") == -1:
-            ErrorPopup(self.master,"Coin ticker appears to be malformed! please enter it formatted as XXX-XXX")
-            return
+        c_form = self.add_coin_popup.value
+        print(c_form)
 
         for c in self.coin_list:
-            if coin_ticker.lower() == c.name.lower():
+            if c_form[2].lower() == c.name.lower() and c_form[0].lower() == c.exchange.lower() and c_form[1].lower() == c.market.lower():
                 InfoPopup(self.master,"You already added this coin!")
                 return
 
-        #this needs some checking
-        coin_data = GetTicker(coin_ticker).json()
-        #create coin object
+            
+        d_market_price = 0
+        d_usd_price = 0
+
+        if c_form[0] == Exchange.Bittrex.name:
+            #bittrex
+            #print(c_form[1]+"-"+c_form[2])
+            coin_data = GetTicker(c_form[1]+"-"+c_form[2]).json()
+            if c_form[1] == Market.BTC.name:
+                d_market_price = self.format_satoshi(coin_data["result"]["Last"])
+                d_usd_price = self.format_dollar(coin_data["result"]["Last"]*self.btc_price)
+            elif c_form[1] == Market.ETH.name:
+                d_market_price = self.format_satoshi(coin_data["result"]["Last"])
+                d_usd_price = self.format_dollar(coin_data["result"]["Last"]*self.eth_price)
+            elif c_form[1] == Market.USDT.name:
+                d_market_price = self.format_dollar(coin_data["result"]["Last"])
+                d_usd_price = "-"
+        elif c_form[0] == Exchange.Binance.name:
+                coin_data = GetTickerBinance(c_form[2].upper()+""+c_form[1].upper()).json()
+                if c_form[1] == Market.BTC.name:
+                    d_market_price = self.format_satoshi(float(coin_data["lastPrice"]))
+                    d_usd_price = self.format_dollar(float(coin_data["lastPrice"])*float(self.btc_price))
+                if c_form[1] == Market.ETH.name:
+                    d_market_price = self.format_satoshi(float(coin_data["lastPrice"]))
+                    d_usd_price = self.format_dollar(float(coin_data["lastPrice"])*float(self.eth_price))
+                if c_form[1] == Market.USDT.name:
+                    d_market_price = self.format_dollar(coin_data["lastPrice"])
+                    d_usd_price = "-"
+                if c_form[1] == Market.BNB.name:
+                    d_market_price = self.format_satoshi(float(coin_data["lastPrice"]))
+                    d_usd_price = self.format_dollar(float(coin_data["lastPrice"])*float(self.bnb_price))
+            
         _coin = Coin(
-            coin_ticker.upper(),
-            self.format_satoshi(coin_data["result"]["Last"]),
-            self.format_dollar(coin_data["result"]["Last"]*self.btc_price)
-        )
-        #add
+                c_form[2].upper(),
+                c_form[0],
+                c_form[1],
+                d_market_price,
+                d_usd_price)
+        
         self.coin_list.append(_coin)
-        #update treeview
+
         self.display_coinlist(False)
 
     def remove_coin(self):
@@ -273,11 +332,13 @@ class Overview:
         #this adds a coin to the treeview only if the "displayed" internal value of it is false
         if first_time:
             for c in self.coin_list:
-                self.cointree.insert('', 'end', values=(c.name,c.btc_price,c.usd_price,len(c.alerts)))
+                if c.market == Market.USDT.name:
+                    c.market_price = self.format_dollar(float(c.market_price))
+                self.cointree.insert('', 'end', values=(c.exchange, c.market,c.name,c.market_price,c.usd_price,len(c.alerts)))
         else:
             for c in [x for x in self.coin_list if x.displayed != True]:
                 c.displayed = True
-                self.cointree.insert('', 'end', values=(c.name,c.btc_price,c.usd_price,len(c.alerts)))
+                self.cointree.insert('', 'end', values=(c.exchange, c.market,c.name,c.market_price,c.usd_price,len(c.alerts)))
 
     def view_alerts(self):
         selected_coin = self.cointree.selection()[0] if len(self.cointree.selection()) > 0 else None

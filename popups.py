@@ -1,21 +1,14 @@
-from tkinter.ttk import *
-from tkinter import Menu, Toplevel, StringVar
-import tkinter
-import collections
-
+from tkinter.ttk import Label, Button, Combobox, Entry, Treeview
+from tkinter import Toplevel
+import collections, os
 
 from pydub import AudioSegment
 from pydub.playback import play
-import os
 
 def center(win, master):
     win.update_idletasks()
-    #print("screen size %dx%d" % (win.winfo_screenwidth(),win.winfo_screenheight()))
-    #print("master window size %dx%d" % (master.winfo_width(), master.winfo_height() + (master.winfo_rootx() - master.winfo_x())))
-    #print("master window pos %dx%d" % (master.winfo_rootx(), master.winfo_rooty()))
     xcenter_of_master = master.winfo_rootx() + (master.winfo_width()/2)
-    ycenter_of_master = master.winfo_rooty() + (((master.winfo_rooty() - master.winfo_y()))/2)
-    #print(xcenter_of_master, ycenter_of_master)
+    ycenter_of_master = master.winfo_rooty() + ((master.winfo_rooty() - master.winfo_y())/2)
     xpos_for_pop = xcenter_of_master - win.winfo_width()/2
     ypos_for_pop = ycenter_of_master - win.winfo_height()/4
     win.geometry("+%d+%d" % (xpos_for_pop, ypos_for_pop))
@@ -43,7 +36,8 @@ class ErrorPopup(object):
 class AlertPopup(object):
     def __init__(self, master, coin, info):
         self.top = Toplevel(master)
-        Label(self.top, text="Alert for " + coin.name +"!" + "\n" + info + "\n" + "The alert has now been removed").pack()
+        Label(self.top, text="Alert for " + coin.name +"!" + "\n" \
+            + info + "\n" + "The alert has now been removed").pack()
         Button(self.top, text='Ok', command=self.cleanup).pack()
         ##center after packing
         center(self.top, master)
@@ -67,28 +61,28 @@ class AreYouSurePopup(object):
 
 class EditSoundsPopup(object):
     def __init__(self, overview, master):
-        self.top = Toplevel(master,padx=50,pady=20)
+        self.top = Toplevel(master, padx=50, pady=20)
         self.top.title("Edit Sounds")
         self.master = master
         self.overview = overview
 
-        s_a = [x[x.rfind("\\")+1:] for x in self.overview.sound_array] 
+        s_a = [x[x.rfind("\\")+1:] for x in self.overview.sound_array]
 
-        ind = next(iter([i for i in range(len(self.overview.sound_array)) if self.overview.sound_array[i].find(self.overview.sound_name) != -1]),None)
+        ind = next(iter([i for i in range(len(self.overview.sound_array)) \
+            if self.overview.sound_array[i].find(self.overview.sound_name) != -1]), None)
         if ind is None:
-            ErrorPopup(self.master,"default sound " + self.overview.sound_name + " not found!")
+            ErrorPopup(self.master, "default sound " + self.overview.sound_name + " not found!")
             return
 
         soundobj = self.overview.sound_array[ind]
         self.c = Combobox(self.top, values=s_a, width=40)
         self.c.set(soundobj[soundobj.rfind("\\")+1:])
-        self.c.grid(row = 1, column =0,columnspan=2,sticky="NEWS")
-        #popupMenu = OptionMenu(self.top, self.tkvar, sound_list)
-        Label(self.top, text="Choose a sound:").grid(row = 0, column = 0,columnspan=2,sticky="NEWS")
-        
-        Button(self.top, text='Preview', command=self.play_s).grid(row=2,column=0,pady=10)
-        Button(self.top, text='Set', command=self.set_s).grid(row=2,column=1,pady=10)
-        
+        self.c.grid(row=1, column=0, columnspan=2, sticky="NEWS")
+        Label(self.top, text="Choose a sound:").grid(row=0, column=0, columnspan=2, sticky="NEWS")
+
+        Button(self.top, text='Preview', command=self.play_s).grid(row=2, column=0, pady=10)
+        Button(self.top, text='Set', command=self.set_s).grid(row=2, column=1, pady=10)
+
         ##center after packing
         center(self.top, master)
 
@@ -100,30 +94,30 @@ class EditSoundsPopup(object):
 
     def set_s(self):
         self.overview.sound_name = self.c.get()
-        self.cleanup() 
+        self.cleanup()
 
     def cleanup(self):
         self.top.destroy()
 
 class AddCoinPopup(object):
-    def __init__(self, master,overview):
+    def __init__(self, master, overview):
         #228 107
         self.top = Toplevel(master, padx=50, pady=5)
         self.top.title("Add Coin")
         #Label(self.top, text="Add coin").grid(row=0,column=0,columnspan=2,sticky="NEWS")
         exch = ["Bittrex", "Binance"]
-        
-        mark = ["BTC","ETH","BNB", "USDT"]
+
+        mark = ["BTC", "ETH", "BNB", "USDT"]
         self.c = Combobox(self.top, values=exch, width=10)
         self.c.set(exch[0])
-        self.c.grid(row=0,column=0,columnspan=2,sticky="NEWS")
+        self.c.grid(row=0, column=0, columnspan=2, sticky="NEWS")
         self.m = Combobox(self.top, values=mark, width=10)
         self.m.set(mark[0])
-        self.m.grid(row=1,column=0,sticky="NEWS")
+        self.m.grid(row=1, column=0, sticky="NEWS")
         self.e = Entry(self.top)
         self.e.focus_set()
-        self.e.grid(row=1,column=1,columnspan=1,sticky="NEWS")
-        Button(self.top, text='Ok', command=self.cleanup).grid(row=2,column=0,columnspan=2)
+        self.e.grid(row=1, column=1, columnspan=1, sticky="NEWS")
+        Button(self.top, text='Ok', command=self.cleanup).grid(row=2, column=0, columnspan=2)
         ##center after packing
         center(self.top, master)
     def cleanup(self,):
@@ -131,25 +125,25 @@ class AddCoinPopup(object):
         self.top.destroy()
 
 class AddAlertPopup(object):
-    def __init__(self, master,coin):
+    def __init__(self, master, coin):
         self.top = Toplevel(master)
         self.top.title("Add Alert")
-        Label(self.top, text=("Alert when price goes")).grid(row=0,column=0,columnspan=2,sticky="NEWS")
+        Label(self.top, text=("Alert when price goes")).grid(row=0, column=0, columnspan=2, sticky="NEWS")
         b_m = ["above", "below"]
         self.a = Combobox(self.top, values=b_m, width=10)
         self.a.set(b_m[0])
-        self.a.grid(row=1,column=0,sticky="NEWS")
+        self.a.grid(row=1, column=0, sticky="NEWS")
 
         self.e = Entry(self.top)
         self.e.focus_set()
-        self.e.grid(row=1,column=1,sticky="NEWS")
+        self.e.grid(row=1, column=1, sticky="NEWS")
 
         mark = [coin.market, "USDT"]
         self.m = Combobox(self.top, values=mark, width=10)
         self.m.set(mark[0])
-        self.m.grid(row=1,column=2,sticky="NEWS")
+        self.m.grid(row=1, column=2, sticky="NEWS")
 
-        Button(self.top, text='Ok', command=self.cleanup).grid(row=2,column=0,columnspan=3)
+        Button(self.top, text='Ok', command=self.cleanup).grid(row=2, column=0, columnspan=3)
         ##center after packing
         center(self.top, master)
     def cleanup(self):
@@ -187,7 +181,7 @@ class ViewAlertsPopup(object):
     def remove_alert(self):
         at_value = self.alerttree.item(self.alerttree.selection()[0])["values"] if len(self.alerttree.selection()) > 0 else None
         if at_value is None:
-            InfoPopup(self.master, "You must select an alert to remove it!")
+            InfoPopup(self, "You must select an alert to remove it!")
             return
         AreYouSure = AreYouSurePopup(self.top, "remove this alert")
         self.removealert_button["state"] = "disabled"

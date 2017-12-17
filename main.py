@@ -9,68 +9,12 @@ from enum import Enum
 from pydub import AudioSegment
 from pydub.playback import play
 
+from objs import Market, Exchange, Coin, Alert, AlertEvent
 from popups import *
 from utils import RepeatedTimer
 from calls import get_ticker, get_last_price
 
 root = tkinter.Tk()
-
-#the alert class, holds the price and whether to check for it being below or above
-class Alert(object):
-    def __init__(self, market, value, g_l):
-        self.market = market
-        self.value = value
-        self.g_l = g_l
-
-#the alert event class, this is sent back when an alert is triggered
-class AlertEvent(object):
-    def __init__(self, alert, info):
-        self.alert = alert
-        self.info = info
-
-class Exchange(Enum):
-    Bittrex = 1
-    Binance = 2
-
-class Market(Enum):
-    BTC = 1
-    ETH = 2
-    USDT = 3
-    BNB = 4
-
-# the coin class, this is used to hold info about a coin including list of alerts
-class Coin(object):
-    def __init__(self, name, exchange, market, market_price, usd_price):
-        self.name = name
-        self.exchange = exchange
-        self.market = market
-        ##used for btc-XXX, ltc-XXX etc
-        self.market_price = market_price
-        self.usd_price = usd_price
-        self.alerts = []
-        self.displayed = False
-
-    def check_alerts(self):
-        alert_events = []
-        for a in self.alerts:
-            old_price = float(a.value)
-            new_price = get_last_price[self.exchange](a.market,self.name)
-            if a.g_l:
-                if new_price > old_price:
-                    alert_events.append(AlertEvent(a, "price is now " + str(new_price) + ""+ self.market + "(greater than the alert price, set at " + str(old_price) + ")"))
-                    self.remove_alert(a)
-            else:
-                if new_price < old_price:
-                    alert_events.append(AlertEvent(a, "price is now " + str(new_price) + ""+ self.market + "(less than the alert price, set at " + str(old_price) + ")"))
-                    self.remove_alert(a)
-            return alert_events
-
-    def add_alert(self, alert):
-        if alert not in self.alerts:
-            self.alerts.append(alert)
-
-    def remove_alert(self, alert):
-        self.alerts = [x for x in self.alerts if x != alert]
 
 class Overview:
     def __init__(self, master):
@@ -96,8 +40,9 @@ class Overview:
         #create menubar
         self.menubar = Menu(master)
         self.settingsmenu = Menu(self.menubar, tearoff=0)
+        self.settingsmenu.add_command(label="Settings", command=self.edit_settings)
         self.settingsmenu.add_command(label="Sounds", command=self.edit_sounds)
-        self.menubar.add_cascade(label="Settings", menu=self.settingsmenu)
+        self.menubar.add_cascade(label="File", menu=self.settingsmenu)
 
         root.config(menu=self.menubar)
 
@@ -107,22 +52,22 @@ class Overview:
         self.cointree = Treeview(master, selectmode="browse", columns=ct_header, show="headings")
         for i in range(len(ct_header)):
             self.cointree.heading(ct_header[i], text=ct_header[i])
-            self.cointree.column(ct_header[i], width=ct_width[i])
+            self.cointree.column(ct_header[i], width=ct_width[i], stretch=False)
         self.cointree.grid(column=0, row=0, columnspan=6, rowspan=6)
 
         #create buttons
         button_frame = Frame(master)
 
         self.addcoin_button = Button(button_frame, text="Add Coin", command=self.add_coin)
-        self.addcoin_button.grid(column=0, row=0)
+        self.addcoin_button.grid(column=0, row=0, sticky="NEWS")
         self.removecoin_button = Button(button_frame, text="Remove Coin", command=self.remove_coin)
-        self.removecoin_button.grid(column=0, row=1)
+        self.removecoin_button.grid(column=0, row=1, sticky="NEWS")
         self.button_separator = Separator(button_frame, orient="horizontal")
         self.button_separator.grid(column=0, row=2, sticky="NEWS", pady=5)
         self.addalert_button = Button(button_frame, text="Add Alert", command=self.add_alert)
-        self.addalert_button.grid(column=0, row=3)
+        self.addalert_button.grid(column=0, row=3, sticky="NEWS")
         self.viewalerts_button = Button(button_frame, text="View Alerts", command=self.view_alerts)
-        self.viewalerts_button.grid(column=0, row=4)
+        self.viewalerts_button.grid(column=0, row=4, sticky="NEWS")
 
         button_frame.grid(column=6, row=0)
 
@@ -162,6 +107,10 @@ class Overview:
     def edit_sounds(self):
         self.edit_sounds_popup = EditSoundsPopup(self, self.master)
         self.master.wait_window(self.edit_sounds_popup.top)
+
+    def edit_settings(self):
+        self.edit_settings_popup = EditSettingsPopup(self, self.master)
+        self.master.wait_window(self.edit_settings_popup.top)
 
     def get_sounds(self):
         sound_array = []
@@ -381,5 +330,7 @@ class Overview:
         root.destroy()
 
 my_gui = Overview(root)
+#not resizable
+root.resizable(0, 0)
 root.iconbitmap(os.path.join(os.getcwd(), "mao.ico"))
 root.mainloop()

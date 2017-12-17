@@ -1,7 +1,8 @@
-from tkinter.ttk import Label, Button, Combobox, Entry, Treeview
-from tkinter import Toplevel
+from tkinter.ttk import Label, Button, Combobox, Entry, Treeview, Notebook, Style, Frame
+from tkinter import Toplevel, Spinbox, StringVar
 import collections, os
 
+from objs import Exchange
 from pydub import AudioSegment
 from pydub.playback import play
 
@@ -57,6 +58,44 @@ class AreYouSurePopup(object):
         self.top.destroy()
     def no(self,):
         self.value = False
+        self.top.destroy()
+
+class EditSettingsPopup(object):
+    def __init__(self, overview, master):
+        self.top = Toplevel(master)
+        self.top.title("Settings")
+        self.master = master
+        self.overview = overview
+
+        self.nb = Notebook(self.top, width=500, height=330)
+
+        self.nb_t1 = Frame(self.top)
+        self.nb_t2 = Frame(self.top)
+        
+        ex = [x.name for x in Exchange]
+
+        #general tab
+        self.t1_exchange = Combobox(self.nb_t1, values=ex, width=20)
+        #replace with old val
+        self.t1_exchange.set(ex[0])
+        Label(self.nb_t1, text="Default exchange:").grid(row=0, column=0, sticky="NEWS")
+        self.t1_exchange.grid(row=0, column=2, columnspan=1)
+        Label(self.nb_t1, text="Update interval(sec):").grid(row=1, column=0, sticky="NEWS")
+        self.t1_interval_var = StringVar()
+        self.t1_interval = Spinbox(self.nb_t1, textvariable=self.t1_interval_var, values=(3,5,10,15,30,60,120,300), width=20)
+        ##replace with old val---set after making spinbox
+        self.t1_interval_var.set("15")
+        self.t1_interval.grid(row=1, column=2, columnspan=1)
+
+        self.nb.add(self.nb_t1, text="General")
+        self.nb.add(self.nb_t2, text="Sounds")
+
+        self.nb.grid(row=0, column=0, columnspan=3, rowspan=3, sticky="NEWS")
+
+        ##center after packing
+        center(self.top, master)
+        
+    def cleanup(self):
         self.top.destroy()
 
 class EditSoundsPopup(object):
@@ -163,7 +202,7 @@ class ViewAlertsPopup(object):
         self.alerttree = Treeview(self.top, selectmode="extended", columns=at_header, show="headings")
         for i in range(len(at_header)):
             self.alerttree.heading(at_header[i], text=at_header[i])
-            self.alerttree.column(at_header[i], width=at_width[i])
+            self.alerttree.column(at_header[i], width=at_width[i], stretch=False)
         self.alerttree.grid(column=0, row=0, columnspan=6, rowspan=6)
         #display alerts
         for a in self.coin.alerts:
